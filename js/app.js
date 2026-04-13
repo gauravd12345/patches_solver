@@ -1,31 +1,36 @@
-import { PUZZLES } from "./puzzles.js";
+import { PUZZLES, emptyGrid, generateRandomPuzzle } from "./puzzles.js";
 import { solvePatches } from "./solver.js";
-
-const ROWS = 5;
-const COLS = 5;
 
 const PATCH_COLORS = ["#e85d4c", "#e6b422", "#8b5cf6", "#22c55e", "#14b8a6", "#f97316", "#6366f1"];
 
 const gridEl = document.getElementById("grid");
 const messageEl = document.getElementById("message");
 const puzzleSelect = document.getElementById("puzzle-select");
+const sizeSelect = document.getElementById("size-select");
 const btnSolve = document.getElementById("btn-solve");
 const btnHint = document.getElementById("btn-hint");
 const btnUndo = document.getElementById("btn-undo");
+const btnRandom = document.getElementById("btn-random");
+const btnClear = document.getElementById("btn-clear");
+const kindSelect = document.getElementById("kind-select");
+const sizeInput = document.getElementById("size-input");
+const btnErase = document.getElementById("btn-erase");
 
 /** @type {(Clue | null)[][]} */
 let currentClues = structuredClone(PUZZLES[0].grid);
+let currentSize = currentClues.length;
 /** @type {import('./solver.js').Rect[] | null} */
 let fullSolution = null;
 /** @type {number[][]} */
 let assignment = freshAssignment();
 /** @type {import('./solver.js').Rect[]} */
 let appliedStack = [];
+let eraseMode = false;
 
 /** @typedef {import('./solver.js').Clue} Clue */
 
 function freshAssignment() {
-  return Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+  return Array.from({ length: currentSize }, () => Array(currentSize).fill(-1));
 }
 
 function setMessage(text, isError = false) {
@@ -59,11 +64,15 @@ function recomputeSolution() {
 }
 
 function render() {
+  gridEl.style.gridTemplateColumns = `repeat(${currentSize}, 1fr)`;
+  gridEl.style.gridTemplateRows = `repeat(${currentSize}, 1fr)`;
   gridEl.innerHTML = "";
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
+  for (let r = 0; r < currentSize; r++) {
+    for (let c = 0; c < currentSize; c++) {
       const cell = document.createElement("div");
       cell.className = "cell";
+      cell.dataset.r = String(r);
+      cell.dataset.c = String(c);
       const pid = assignment[r][c];
       if (pid >= 0) {
         const fill = document.createElement("div");
@@ -151,23 +160,126 @@ function doUndo() {
   setMessage(appliedStack.length ? `${appliedStack.length} patch(es) on the board.` : "");
 }
 
-function initSelect() {
-  PUZZLES.forEach((p, i) => {
+function cloneGrid(grid) {
+  return grid.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
+}
+
+function maxAreaForSize(size) {
+  return size * size;
+}
+
+function syncAreaInput() {
+  sizeInput.max = String(maxAreaForSize(currentSize));
+  if (+sizeInput.value > maxAreaForSize(currentSize)) {
+    sizeInput.value = String(maxAreaForSize(currentSize));
+  }
+}
+
+function loadGrid(grid, message = "") {
+  currentClues = cloneGrid(grid);
+  currentSize = currentClues.length;
+  sizeSelect.value = String(currentSize);
+  syncAreaInput();
+  recomputeSolution();
+  if (message) {
+    setMessage(message, false);
+  }
+}
+
+function refreshPuzzleSelect() {
+  puzzleSelect.innerHTML = "";
+  const matching = PUZZLES.filter((p) => p.size === currentSize);
+  for (const [i, p] of matching.entries()) {
     const o = document.createElement("option");
     o.value = String(i);
     o.textContent = p.name;
     puzzleSelect.appendChild(o);
-  });
+  }
+  const custom = document.createElement("option");
+  custom.value = "custom";
+  custom.textContent = "Custom";
+  puzzleSelect.appendChild(custom);
+}
+
+function loadPresetByIndex(index) {
+  const matching = PUZZLES.filter((p) => p.size === currentSize);
+  const puzzle = matching[index];
+  if (!puzzle) {
+    loadGrid(emptyGrid(currentSize), "Custom grid ready.");
+    puzzleSelect.value = "custom";
+    return;
+  }
+  loadGrid(puzzle.grid);
+}
+
+function clearClues() {
+  loadGrid(emptyGrid(currentSize), "Custom grid ready.");
+  puzzleSelect.value = "custom";
+}
+
+function makeRandomGrid() {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const grid = generateRandomPuzzle(currentSize);
+    if (solvePatches(grid)) {
+      loadGrid(grid, "Random solvable grid generated.");
+      puzzleSelect.value = "custom";
+      return;
+    }
+  }
+  setMessage("Could not generate a solvable random grid right now. Try again.", true);
+}
+
+function applyEditorToCell(r, c) {
+  if (eraseMode) {
+    currentClues[r][c] = null;
+  } else {
+    const area = Math.max(1, Math.min(maxAreaForSize(currentSize), Number(sizeInput.value) || 1));
+    sizeInput.value = String(area);
+    currentClues[r][c] = { kind: kindSelect.value, n: area };
+  }
+  puzzleSelect.value = "custom";
+  recomputeSolution();
+  if (!fullSolution) {
+    setMessage("Clue updated, but this grid currently has no solution.", true);
+  } else {
+    setMessage("Custom grid updated.");
+  }
+}
+
+function initSelects() {
+  currentSize = Number(sizeSelect.value);
+  refreshPuzzleSelect();
   puzzleSelect.addEventListener("change", () => {
-    const i = +puzzleSelect.value;
-    currentClues = structuredClone(PUZZLES[i].grid);
-    recomputeSolution();
+    if (puzzleSelect.value === "custom") {
+      setMessage("Custom editing mode.");
+      return;
+    }
+    loadPresetByIndex(+puzzleSelect.value);
+  });
+  sizeSelect.addEventListener("change", () => {
+    currentSize = Number(sizeSelect.value);
+    refreshPuzzleSelect();
+    clearClues();
   });
 }
+
+gridEl.addEventListener("click", (event) => {
+  const cell = event.target.closest(".cell");
+  if (!cell) return;
+  applyEditorToCell(+cell.dataset.r, +cell.dataset.c);
+});
 
 btnSolve.addEventListener("click", doSolveAll);
 btnHint.addEventListener("click", doHint);
 btnUndo.addEventListener("click", doUndo);
+btnRandom.addEventListener("click", makeRandomGrid);
+btnClear.addEventListener("click", clearClues);
+btnErase.addEventListener("click", () => {
+  eraseMode = !eraseMode;
+  btnErase.classList.toggle("active", eraseMode);
+  setMessage(eraseMode ? "Erase mode enabled." : "Erase mode disabled.");
+});
 
-initSelect();
-recomputeSolution();
+initSelects();
+syncAreaInput();
+loadPresetByIndex(0);
