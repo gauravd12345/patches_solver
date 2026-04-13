@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patches solver</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <h1>Patches</h1>
+        <p class="sub">5×5 grid · place one clue per rectangle · solver fills valid patches</p>
+        <label class="puzzle-pick">
+          <span>Puzzle</span>
+          <select id="puzzle-select" aria-label="Choose puzzle"></select>
+        </label>
+      </header>
+
+      <div id="grid" class="grid" role="img" aria-label="Puzzle grid"></div>
+
+      <p id="message" class="message" role="status"></p>
+
+      <div class="actions">
+        <button type="button" id="btn-solve" class="btn primary">Solve</button>
+        <button type="button" id="btn-hint" class="btn">Hint</button>
+        <button type="button" id="btn-undo" class="btn">Undo</button>
+      </div>
+
+      <section class="legend" aria-label="How clues work">
+        <h2>Complete each shape to fill the grid</h2>
+        <ul class="legend-list">
+          <li>
+            <span class="ic ic-square" aria-hidden="true"></span>
+            <span>Square — width equals height</span>
+          </li>
+          <li>
+            <span class="ic ic-tall" aria-hidden="true"></span>
+            <span>Tall — height is greater than width</span>
+          </li>
+          <li>
+            <span class="ic ic-wide" aria-hidden="true"></span>
+            <span>Wide — width is greater than height</span>
+          </li>
+          <li>
+            <span class="ic ic-any" aria-hidden="true"></span>
+            <span>Any — any rectangle with the given area</span>
+          </li>
+        </ul>
+        <p class="legend-note">If a clue shows a number, the patch covering that cell must have exactly that many squares.</p>
+      </section>
+    </div>
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>
